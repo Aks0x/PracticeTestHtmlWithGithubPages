@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Three.js MacBook-Friendly First Person Demo</title>
+
+<style>
+html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    font-family: Arial, sans-serif;
+}
+
+#overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.75);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    cursor: pointer;
+    z-index: 10;
+}
+</style>
+</head>
+<body>
+
+<div id="overlay">
+    <div>
+        <h2>3D Demo</h2>
+        <p>Click to Start</p>
+        <p>W A S D = Walk</p>
+        <p>Click + Drag = Look Around</p>
+        <p>Works well with MacBook trackpads</p>
+    </div>
+</div>
+
+<script type="module">
+import * as THREE from "https://unpkg.com/three@0.166.1/build/three.module.js";
+
+// ----------------------------------------------------
+// Scene
+// ----------------------------------------------------
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x87ceeb);
+
+// ----------------------------------------------------
+// Camera
+// ----------------------------------------------------
+
+const camera = new THREE.PerspectiveCamera(
+    75,
+    window.innerWidth / window.innerHeight,
+    0.1,
+    1000
+);
+
+camera.position.set(0, 1.8, 8);
+
+// ----------------------------------------------------
+// Renderer
+// ----------------------------------------------------
+
+const renderer = new THREE.WebGLRenderer({
+    antialias: true
+});
+
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+
+document.body.appendChild(renderer.domElement);
+
+// ----------------------------------------------------
+// Lights
+// ----------------------------------------------------
+
+scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+
+const sun = new THREE.DirectionalLight(0xffffff, 2);
+sun.position.set(20, 30, 20);
+sun.castShadow = true;
+scene.add(sun);
+
+// ----------------------------------------------------
+// Ground
+// ----------------------------------------------------
+
+const ground = new THREE.Mesh(
+    new THREE.PlaneGeometry(200, 200),
+    new THREE.MeshStandardMaterial({
+        color: 0x4c9a4c
+    })
+);
+
+ground.rotation.x = -Math.PI / 2;
+ground.receiveShadow = true;
+scene.add(ground);
+
+// ----------------------------------------------------
+// Showcase pedestal
+// ----------------------------------------------------
+
+const pedestal = new THREE.Mesh(
+    new THREE.CylinderGeometry(2, 2, 1.5, 32),
+    new THREE.MeshStandardMaterial({
+        color: 0x888888,
+        metalness: 0.3,
+        roughness: 0.5
+    })
+);
+
+pedestal.position.set(0, 0.75, 0);
+pedestal.castShadow = true;
+scene.add(pedestal);
+
+// ----------------------------------------------------
+// Rotating cube
+// ----------------------------------------------------
+
+const showcaseCube = new THREE.Mesh(
+    new THREE.BoxGeometry(2, 2, 2),
+    new THREE.MeshStandardMaterial({
+        color: 0x00aaff,
+        metalness: 0.6,
+        roughness: 0.2
+    })
+);
+
+showcaseCube.position.set(0, 3, 0);
+showcaseCube.castShadow = true;
+scene.add(showcaseCube);
+
+// ----------------------------------------------------
+// Random cubes around scene
+// ----------------------------------------------------
+
+for (let i = 0; i < 30; i++) {
+    const cube = new THREE.Mesh(
+        new THREE.BoxGeometry(),
+        new THREE.MeshStandardMaterial({
+            color: Math.random() * 0xffffff
+        })
+    );
+
+    cube.position.set(
+        (Math.random() - 0.5) * 80,
+        0.5,
+        (Math.random() - 0.5) * 80
+    );
+
+    cube.castShadow = true;
+    cube.receiveShadow = true;
+
+    scene.add(cube);
+}
+
+// ----------------------------------------------------
+// Overlay
+// ----------------------------------------------------
+
+const overlay = document.getElementById("overlay");
+
+overlay.addEventListener("click", () => {
+    overlay.style.display = "none";
+});
+
+// ----------------------------------------------------
+// Camera look system
+// ----------------------------------------------------
+
+let yaw = 0;
+let pitch = 0;
+
+let dragging = false;
+let lastX = 0;
+let lastY = 0;
+
+renderer.domElement.addEventListener("mousedown", e => {
+    dragging = true;
+    lastX = e.clientX;
+    lastY = e.clientY;
+});
+
+window.addEventListener("mouseup", () => {
+    dragging = false;
+});
+
+window.addEventListener("mousemove", e => {
+    if (!dragging) return;
+
+    const dx = e.clientX - lastX;
+    const dy = e.clientY - lastY;
+
+    lastX = e.clientX;
+    lastY = e.clientY;
+
+    yaw -= dx * 0.003;
+    pitch -= dy * 0.003;
+
+    const limit = Math.PI / 2 - 0.1;
+    pitch = Math.max(-limit, Math.min(limit, pitch));
+});
+
+// Touch support
+
+renderer.domElement.addEventListener("touchstart", e => {
+    const t = e.touches[0];
+
+    dragging = true;
+    lastX = t.clientX;
+    lastY = t.clientY;
+});
+
+renderer.domElement.addEventListener("touchmove", e => {
+    if (!dragging) return;
+
+    const t = e.touches[0];
+
+    const dx = t.clientX - lastX;
+    const dy = t.clientY - lastY;
+
+    lastX = t.clientX;
+    lastY = t.clientY;
+
+    yaw -= dx * 0.003;
+    pitch -= dy * 0.003;
+
+    const limit = Math.PI / 2 - 0.1;
+    pitch = Math.max(-limit, Math.min(limit, pitch));
+});
+
+renderer.domElement.addEventListener("touchend", () => {
+    dragging = false;
+});
+
+// ----------------------------------------------------
+// Movement
+// ----------------------------------------------------
+
+const keys = {};
+
+document.addEventListener("keydown", e => {
+    keys[e.code] = true;
+});
+
+document.addEventListener("keyup", e => {
+    keys[e.code] = false;
+});
+
+// ----------------------------------------------------
+// Animation
+// ----------------------------------------------------
+
+const clock = new THREE.Clock();
+
+function animate() {
+
+    requestAnimationFrame(animate);
+
+    const delta = clock.getDelta();
+
+    camera.rotation.order = "YXZ";
+    camera.rotation.y = yaw;
+    camera.rotation.x = pitch;
+
+    const speed = 8;
+
+    const forward = new THREE.Vector3(
+        Math.sin(yaw),
+        0,
+        Math.cos(yaw)
+    );
+
+    const right = new THREE.Vector3(
+        Math.cos(yaw),
+        0,
+        -Math.sin(yaw)
+    );
+
+    if (keys["KeyW"]) {
+        camera.position.addScaledVector(forward, -speed * delta);
+    }
+
+    if (keys["KeyS"]) {
+        camera.position.addScaledVector(forward, speed * delta);
+    }
+
+    if (keys["KeyA"]) {
+        camera.position.addScaledVector(right, -speed * delta);
+    }
+
+    if (keys["KeyD"]) {
+        camera.position.addScaledVector(right, speed * delta);
+    }
+
+    camera.position.y = 1.8;
+
+    showcaseCube.rotation.x += delta * 0.6;
+    showcaseCube.rotation.y += delta * 1.2;
+
+    renderer.render(scene, camera);
+}
+
+animate();
+
+// ----------------------------------------------------
+// Resize
+// ----------------------------------------------------
+
+window.addEventListener("resize", () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(
+        window.innerWidth,
+        window.innerHeight
+    );
+});
+</script>
+
+</body>
+</html>
